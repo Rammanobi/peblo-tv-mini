@@ -213,6 +213,12 @@ jobs:
       - name: Set image tag
         run: echo "IMAGE_TAG=${GITHUB_SHA::12}" >> "$GITHUB_ENV"
 
+      # The default "docker" buildx driver on GitHub-hosted runners can't
+      # export a build cache (type=gha) below — only the docker-container
+      # driver this action sets up can. Without it, every build fails with
+      # "Cache export is not supported for the docker driver."
+      - uses: docker/setup-buildx-action@v3
+
       - name: Build ${{ matrix.service }} image
         uses: docker/build-push-action@v6
         with:
