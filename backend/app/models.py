@@ -5,11 +5,11 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
-    Index,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -158,7 +158,8 @@ class PublishRun(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     run_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
-    status: Mapped[str] = mapped_column(String(32), nullable=False)  # running|success|success_with_warnings|blocked|failed
+    # status: running|success|success_with_warnings|blocked|failed
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
     version: Mapped[int | None] = mapped_column(Integer, nullable=True)
     published_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     note: Mapped[str | None] = mapped_column(String(500), nullable=True)

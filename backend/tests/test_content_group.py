@@ -32,7 +32,11 @@ async def test_content_group_collapsing_produces_language_list(client, editor_to
     from tests.test_publish import _png_bytes
 
     headers = {"Authorization": f"Bearer {editor_token}"}
-    r = await client.post("/shows", headers=headers, json={"title": "Collapse Show", "category": "comedy", "section": "kids"})
+    r = await client.post(
+        "/shows",
+        headers=headers,
+        json={"title": "Collapse Show", "category": "comedy", "section": "kids"},
+    )
     show = r.json()
     for kind, w, h in [("poster", 600, 900), ("banner", 1280, 720)]:
         files = {"file": (f"{kind}.png", _png_bytes(w, h), "image/png")}

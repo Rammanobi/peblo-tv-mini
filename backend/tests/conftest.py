@@ -6,7 +6,9 @@ from pathlib import Path
 TEST_DIR = Path(tempfile.mkdtemp(prefix="peblo-test-"))
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
-os.environ["DATABASE_URL"] = os.environ.get("PEBLO_TEST_DATABASE_URL") or f"sqlite+aiosqlite:///{(TEST_DIR / 'test.db').as_posix()}"
+os.environ["DATABASE_URL"] = (
+    os.environ.get("PEBLO_TEST_DATABASE_URL") or f"sqlite+aiosqlite:///{(TEST_DIR / 'test.db').as_posix()}"
+)
 os.environ["JWT_SECRET"] = "test-secret"
 os.environ["STORAGE_BACKEND"] = "local"
 os.environ["STORAGE_LOCAL_DIR"] = (TEST_DIR / "storage").as_posix()
@@ -17,15 +19,14 @@ os.environ["SEED_PATH"] = (BACKEND_DIR.parent / "data" / "seed_shows.json").as_p
 
 sys.path.insert(0, str(BACKEND_DIR))
 
-import pytest
-import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import create_async_engine
+import pytest_asyncio  # noqa: E402
+from httpx import ASGITransport, AsyncClient  # noqa: E402
+from sqlalchemy.ext.asyncio import create_async_engine  # noqa: E402
 
-import app.database as db_module
-from app.database import Base
-from app.main import create_app
-from scripts.seed import seed_if_needed
+import app.database as db_module  # noqa: E402
+from app.database import Base  # noqa: E402
+from app.main import create_app  # noqa: E402
+from scripts.seed import seed_if_needed  # noqa: E402
 
 
 @pytest_asyncio.fixture

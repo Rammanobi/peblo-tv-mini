@@ -26,7 +26,11 @@ async def _make_publishable_show(client, headers):
         r = await client.post(f"/shows/{show['id']}/artwork", headers=headers, data={"kind": kind}, files=files)
         assert r.status_code == 201, r.text
 
-    r = await client.post(f"/shows/{show['id']}/seasons", headers=headers, json={"season_number": 1, "title": "Season 1"})
+    r = await client.post(
+        f"/shows/{show['id']}/seasons",
+        headers=headers,
+        json={"season_number": 1, "title": "Season 1"},
+    )
     assert r.status_code == 201, r.text
     season = r.json()
 

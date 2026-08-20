@@ -1,53 +1,52 @@
-from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
 
 class ShowCreate(BaseModel):
     title: str
-    slug: Optional[str] = None
-    description: Optional[str] = None
+    slug: str | None = None
+    description: str | None = None
     category: str
-    section: Optional[str] = None
-    status: Optional[str] = "draft"
+    section: str | None = None
+    status: str | None = "draft"
 
 
 class ShowUpdate(BaseModel):
-    title: Optional[str] = None
-    slug: Optional[str] = None
-    description: Optional[str] = None
-    category: Optional[str] = None
-    section: Optional[str] = None
-    status: Optional[str] = None
+    title: str | None = None
+    slug: str | None = None
+    description: str | None = None
+    category: str | None = None
+    section: str | None = None
+    status: str | None = None
 
 
 class SeasonCreate(BaseModel):
     season_number: int = Field(ge=0)
-    title: Optional[str] = None
+    title: str | None = None
 
 
 class SeasonUpdate(BaseModel):
-    title: Optional[str] = None
+    title: str | None = None
 
 
 class EpisodeCreate(BaseModel):
     title: str
-    episode_number: Optional[int] = None
+    episode_number: int | None = None
     content_group: str
     language: str
-    duration_seconds: Optional[int] = None
-    synopsis: Optional[str] = None
-    status: Optional[str] = "draft"
+    duration_seconds: int | None = None
+    synopsis: str | None = None
+    status: str | None = "draft"
 
 
 class EpisodeUpdate(BaseModel):
-    title: Optional[str] = None
-    episode_number: Optional[int] = None
-    content_group: Optional[str] = None
-    language: Optional[str] = None
-    duration_seconds: Optional[int] = None
-    synopsis: Optional[str] = None
-    status: Optional[str] = None
+    title: str | None = None
+    episode_number: int | None = None
+    content_group: str | None = None
+    language: str | None = None
+    duration_seconds: int | None = None
+    synopsis: str | None = None
+    status: str | None = None
 
 
 class LoginRequest(BaseModel):
@@ -57,4 +56,4 @@ class LoginRequest(BaseModel):
 
 class PublishRequest(BaseModel):
     dry_run: bool = False
-    note: Optional[str] = None
+    note: str | None = None

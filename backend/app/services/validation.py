@@ -190,7 +190,14 @@ async def run_validation_report(session: AsyncSession, show_id: int | None = Non
         for code, d in artwork_issues(a):
             if a.owner_type == "show":
                 show_id_for = a.owner_id
-                resource = {"type": "show", "id": shows_by_id[a.owner_id].id, "title": shows_by_id[a.owner_id].title} if a.owner_id in shows_by_id else {"type": "show", "id": a.owner_id}
+                if a.owner_id in shows_by_id:
+                    resource = {
+                        "type": "show",
+                        "id": shows_by_id[a.owner_id].id,
+                        "title": shows_by_id[a.owner_id].title,
+                    }
+                else:
+                    resource = {"type": "show", "id": a.owner_id}
             else:
                 ep = next((e for e in episodes if e.id == a.owner_id), None)
                 if not ep:

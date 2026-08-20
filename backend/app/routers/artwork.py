@@ -31,13 +31,30 @@ def _artwork_out(a: Artwork) -> dict:
     return d
 
 
-async def _upload(session: AsyncSession, owner_type: str, owner_id: int, owner_title: str, kind: str, file: UploadFile, alt_text: str | None, allowed_kinds: list[str]):
+async def _upload(
+    session: AsyncSession,
+    owner_type: str,
+    owner_id: int,
+    owner_title: str,
+    kind: str,
+    file: UploadFile,
+    alt_text: str | None,
+    allowed_kinds: list[str],
+):
     if kind not in allowed_kinds:
         raise ApiError(
             422,
             "validation_error",
             f'"{kind}" is not a valid artwork kind for this resource.',
-            [{"code": "ENUM_NOT_ALLOWED", "field": "kind", "message": f"Allowed kinds: {', '.join(allowed_kinds)}.", "hint": None, "resource": None}],
+            [
+                {
+                    "code": "ENUM_NOT_ALLOWED",
+                    "field": "kind",
+                    "message": f"Allowed kinds: {', '.join(allowed_kinds)}.",
+                    "hint": None,
+                    "resource": None,
+                }
+            ],
         )
     data = await file.read()
     mime_type = file.content_type or "application/octet-stream"
@@ -97,16 +114,26 @@ async def upload_episode_artwork(
     ep = (await session.execute(select(Episode).where(Episode.id == episode_id))).scalar_one_or_none()
     if not ep:
         raise ApiError(404, "not_found", f"Episode #{episode_id} was not found.")
-    art = await _upload(session, "episode", episode_id, ep.title, kind, file, alt_text, reference.required_episode_kinds())
+    art = await _upload(
+        session, "episode", episode_id, ep.title, kind, file, alt_text, reference.required_episode_kinds()
+    )
     return _artwork_out(art)
 
 
 @router.get("/episodes/{episode_id}/artwork")
-async def list_episode_artwork(episode_id: int, user: CurrentUser = Depends(require_editor), session: AsyncSession = Depends(get_session)):
+async def list_episode_artwork(
+    episode_id: int,
+    user: CurrentUser = Depends(require_editor),
+    session: AsyncSession = Depends(get_session),
+):
     ep = (await session.execute(select(Episode).where(Episode.id == episode_id))).scalar_one_or_none()
     if not ep:
         raise ApiError(404, "not_found", f"Episode #{episode_id} was not found.")
-    arts = (await session.execute(select(Artwork).where(Artwork.owner_type == "episode", Artwork.owner_id == episode_id))).scalars().all()
+    arts = (
+        await session.execute(
+            select(Artwork).where(Artwork.owner_type == "episode", Artwork.owner_id == episode_id)
+        )
+    ).scalars().all()
     present = {a.kind for a in arts}
     missing = [k for k in reference.required_episode_kinds() if k not in present]
     return {"items": [_artwork_out(a) for a in arts], "missing_kinds": missing}
@@ -129,18 +156,30 @@ async def upload_show_artwork(
 
 
 @router.get("/shows/{show_id}/artwork")
-async def list_show_artwork(show_id: int, user: CurrentUser = Depends(require_editor), session: AsyncSession = Depends(get_session)):
+async def list_show_artwork(
+    show_id: int,
+    user: CurrentUser = Depends(require_editor),
+    session: AsyncSession = Depends(get_session),
+):
     show = (await session.execute(select(Show).where(Show.id == show_id))).scalar_one_or_none()
     if not show:
         raise ApiError(404, "not_found", f"Show #{show_id} was not found.")
-    arts = (await session.execute(select(Artwork).where(Artwork.owner_type == "show", Artwork.owner_id == show_id))).scalars().all()
+    arts = (
+        await session.execute(
+            select(Artwork).where(Artwork.owner_type == "show", Artwork.owner_id == show_id)
+        )
+    ).scalars().all()
     present = {a.kind for a in arts}
     missing = [k for k in reference.required_show_kinds() if k not in present]
     return {"items": [_artwork_out(a) for a in arts], "missing_kinds": missing}
 
 
 @router.delete("/artwork/{artwork_id}", status_code=204)
-async def delete_artwork(artwork_id: int, user: CurrentUser = Depends(require_editor), session: AsyncSession = Depends(get_session)):
+async def delete_artwork(
+    artwork_id: int,
+    user: CurrentUser = Depends(require_editor),
+    session: AsyncSession = Depends(get_session),
+):
     art = (await session.execute(select(Artwork).where(Artwork.id == artwork_id))).scalar_one_or_none()
     if not art:
         raise ApiError(404, "not_found", f"Artwork #{artwork_id} was not found.")
@@ -153,7 +192,8 @@ async def delete_artwork(artwork_id: int, user: CurrentUser = Depends(require_ed
                 raise ApiError(
                     409,
                     "conflict",
-                    f'"{ep.title}" is published and needs a {art.kind}. Unpublish the episode or upload a replacement first.',
+                    f'"{ep.title}" is published and needs a {art.kind}. '
+                    "Unpublish the episode or upload a replacement first.",
                 )
     else:
         show = (await session.execute(select(Show).where(Show.id == art.owner_id))).scalar_one_or_none()
@@ -163,7 +203,8 @@ async def delete_artwork(artwork_id: int, user: CurrentUser = Depends(require_ed
                 raise ApiError(
                     409,
                     "conflict",
-                    f'"{show.title}" is published and needs a {art.kind}. Unpublish the show or upload a replacement first.',
+                    f'"{show.title}" is published and needs a {art.kind}. '
+                    "Unpublish the show or upload a replacement first.",
                 )
 
     storage = get_storage()
@@ -173,4 +214,3 @@ async def delete_artwork(artwork_id: int, user: CurrentUser = Depends(require_ed
         pass
     await session.delete(art)
     await session.commit()
-    return None

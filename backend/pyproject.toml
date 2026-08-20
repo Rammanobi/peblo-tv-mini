@@ -1,0 +1,11 @@
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+# Scope to pyflakes + pycodestyle + import-sort, matching what the flake8
+# step already checks. Ruff's full default rule set (BLE, SIM, RUF, PLR, ...)
+# is a stricter opinionated style guide than this project's CI intends to
+# gate on — those are worth a future pass, not a reason to block "lint".
+select = ["E", "F", "W", "I"]
+ignore = ["E203"]

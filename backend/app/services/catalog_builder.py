@@ -1,5 +1,4 @@
 """Builds the published catalogue.json structure from the live DB state."""
-import datetime as dt
 from collections import defaultdict
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -126,13 +125,13 @@ async def build_catalog(session: AsyncSession):
             groups = cg_groups_by_season.get(season.id, {})
             entries = []
             for cg, rows in groups.items():
-                langs = sorted({r.language for r in rows}, key=lambda l: (l != default_lang, l))
+                langs = sorted({r.language for r in rows}, key=lambda lang: (lang != default_lang, lang))
                 default_row = _pick_default(rows, default_lang)
                 ep_art = _artwork_map(artworks, "episode", default_row.id)
                 show_languages.update(langs)
                 total_collapsed += len(rows) - 1
-                for l in langs:
-                    counts_languages[l] += 1
+                for lang in langs:
+                    counts_languages[lang] += 1
                 entry = {
                     "content_group": cg,
                     "episode_number": default_row.episode_number,
@@ -167,7 +166,7 @@ async def build_catalog(session: AsyncSession):
             "description": show.description,
             "category": show.category,
             "category_label": reference.category_label(show.category),
-            "languages": sorted(show_languages, key=lambda l: (l != default_lang, l)),
+            "languages": sorted(show_languages, key=lambda lang: (lang != default_lang, lang)),
             "artwork": show_artwork,
             "seasons": seasons_out,
             "trailers": trailers_out,
@@ -190,7 +189,10 @@ async def build_catalog(session: AsyncSession):
 
     catalog = {
         "reference_version": reference.load_reference()["reference_version"],
-        "languages": sorted({l for l in counts_languages.keys()} | {default_lang}, key=lambda l: (l != default_lang, l)),
+        "languages": sorted(
+            {lang for lang in counts_languages} | {default_lang},
+            key=lambda lang: (lang != default_lang, lang),
+        ),
         "sections": sections_final,
     }
 

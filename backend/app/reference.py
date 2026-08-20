@@ -26,20 +26,20 @@ def category_keys() -> set[str]:
 
 
 def language_codes() -> set[str]:
-    return {l["code"] for l in load_reference()["languages"]}
+    return {lang["code"] for lang in load_reference()["languages"]}
 
 
 def default_language() -> str:
-    for l in load_reference()["languages"]:
-        if l.get("is_default"):
-            return l["code"]
+    for lang in load_reference()["languages"]:
+        if lang.get("is_default"):
+            return lang["code"]
     return "en"
 
 
 def language_label(code: str) -> str:
-    for l in load_reference()["languages"]:
-        if l["code"] == code:
-            return l["label"]
+    for lang in load_reference()["languages"]:
+        if lang["code"] == code:
+            return lang["label"]
     return code
 
 

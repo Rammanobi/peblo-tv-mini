@@ -58,7 +58,7 @@ async def run_publish(session: AsyncSession, user_id: int, user_email: str, dry_
             details,
         )
 
-    catalog, counts, warnings, skipped_shows, skipped_episodes = await build_catalog(session)
+    catalog, counts, warnings, _skipped_shows, _skipped_episodes = await build_catalog(session)
     last_run = await get_last_successful_run(session)
     new_hash = _stable_hash(catalog)
 

@@ -16,12 +16,21 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 
 @router.post("/catalog/publish")
-async def publish(payload: PublishRequest = PublishRequest(), user: CurrentUser = Depends(require_admin), session: AsyncSession = Depends(get_session)):
+async def publish(
+    payload: PublishRequest = PublishRequest(),
+    user: CurrentUser = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+):
     return await run_publish(session, user.id, user.email, payload.dry_run, payload.note)
 
 
 @router.get("/catalog/publish-runs")
-async def publish_runs(limit: int = 50, offset: int = 0, user: CurrentUser = Depends(require_editor), session: AsyncSession = Depends(get_session)):
+async def publish_runs(
+    limit: int = 50,
+    offset: int = 0,
+    user: CurrentUser = Depends(require_editor),
+    session: AsyncSession = Depends(get_session),
+):
     limit, offset = paginate_params(limit, offset)
     total = (await session.execute(select(PublishRun))).scalars().all()
     total_count = len(total)

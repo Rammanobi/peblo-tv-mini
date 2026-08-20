@@ -1,7 +1,7 @@
 import hashlib
 import json
 
-from fastapi import APIRouter, Query, Response
+from fastapi import APIRouter, Response
 
 from app import reference
 from app.errors import ApiError
@@ -35,22 +35,48 @@ async def search(
             422,
             "validation_error",
             f'"{category}" is not a supported category.',
-            [{"code": "ENUM_NOT_ALLOWED", "field": "category", "message": "See reference.json categories.", "hint": None, "resource": None}],
+            [
+                {
+                    "code": "ENUM_NOT_ALLOWED",
+                    "field": "category",
+                    "message": "See reference.json categories.",
+                    "hint": None,
+                    "resource": None,
+                }
+            ],
         )
     if language is not None and language not in reference.language_codes():
-        codes = ", ".join(f'{l["code"]} ({l["label"]})' for l in reference.load_reference()["languages"])
+        codes = ", ".join(
+            f'{lang["code"]} ({lang["label"]})' for lang in reference.load_reference()["languages"]
+        )
         raise ApiError(
             422,
             "validation_error",
             f'"{language}" is not a supported language.',
-            [{"code": "ENUM_NOT_ALLOWED", "field": "language", "message": f"Supported languages are: {codes}.", "hint": "Remove the language filter or use one of the supported codes.", "resource": None}],
+            [
+                {
+                    "code": "ENUM_NOT_ALLOWED",
+                    "field": "language",
+                    "message": f"Supported languages are: {codes}.",
+                    "hint": "Remove the language filter or use one of the supported codes.",
+                    "resource": None,
+                }
+            ],
         )
     if section is not None and section not in reference.section_keys():
         raise ApiError(
             422,
             "validation_error",
             f'"{section}" is not a supported section.',
-            [{"code": "ENUM_NOT_ALLOWED", "field": "section", "message": "See reference.json sections.", "hint": None, "resource": None}],
+            [
+                {
+                    "code": "ENUM_NOT_ALLOWED",
+                    "field": "section",
+                    "message": "See reference.json sections.",
+                    "hint": None,
+                    "resource": None,
+                }
+            ],
         )
 
     catalog = await load_catalog_or_404()
