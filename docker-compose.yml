@@ -1,0 +1,113 @@
+version: "3.9"
+
+# Peblo TV Mini — local orchestration.
+# `docker-compose up` (no manual steps) must give you:
+#   - a seeded Postgres database
+#   - the FastAPI backend on http://localhost:4000 (docs at /docs, health at /health)
+#   - the CMS on http://localhost:3000
+#   - the Viewer on http://localhost:3001
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-peblo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-peblo}
+      POSTGRES_DB: ${POSTGRES_DB:-peblo_tv}
+    ports:
+      # Exposed on the host purely for local debugging (psql, GUI clients).
+      # The api service talks to postgres over the compose network, not this port.
+      # Host port 5532 avoids clashing with other local Postgres instances on 5432.
+      - "5532:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-peblo} -d ${POSTGRES_DB:-peblo_tv}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-peblo}:${POSTGRES_PASSWORD:-peblo}@postgres:5432/${POSTGRES_DB:-peblo_tv}
+      JWT_SECRET: ${JWT_SECRET:-dev-only-change-me}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000,http://localhost:3001}
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      STORAGE_LOCAL_DIR: ${STORAGE_LOCAL_DIR:-/data/storage}
+      CATALOG_DIR: ${CATALOG_DIR:-/data/storage/catalog}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_REGION: ${S3_REGION:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-}
+      STORAGE_PUBLIC_BASE_URL: ${STORAGE_PUBLIC_BASE_URL:-http://localhost:4000/static/artwork}
+      REFERENCE_PATH: /seed-data/reference.json
+      SEED_PATH: /seed-data/seed_shows.json
+      PORT: "4000"
+    ports:
+      - "4000:4000"
+    volumes:
+      - api_storage:/data/storage
+      # Seed fixture + reference.json live at the repo root, not inside backend/ —
+      # mount them read-only at a separate path (avoids nesting under /data/storage).
+      - ./data:/seed-data:ro
+    # Idempotent first-boot sequence: migrate schema, seed fixture data (safe to
+    # re-run — the seed script upserts / no-ops if already seeded), then serve.
+    # If this container restarts, migrations and the seed step simply run again
+    # and should be no-ops against an already-current database.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        echo "[api] running migrations..."
+        alembic upgrade head
+        echo "[api] seeding database..."
+        python -m scripts.seed
+        echo "[api] starting uvicorn..."
+        exec uvicorn app.main:app --host 0.0.0.0 --port 4000
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:4000/api/v1/health').status==200 else 1)\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  cms:
+    build:
+      context: ./cms
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:4000}
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      # nginx inside the cms image listens on 80; map it to the conventional 3000.
+      - "3000:80"
+
+  viewer:
+    build:
+      context: ./viewer
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:4000/api/v1}
+        VITE_CATALOGUE_URL: ${VITE_CATALOGUE_URL:-http://localhost:4000/api/v1}
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      # nginx inside the viewer image listens on 80; map it to the conventional 3001.
+      - "3001:80"
+
+volumes:
+  postgres_data:
+  api_storage:

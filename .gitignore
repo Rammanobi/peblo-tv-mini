@@ -1,0 +1,34 @@
+# --- Secrets / environment ---
+.env
+.env.local
+*.env.*.local
+!.env.example
+
+# --- Python (backend) ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+*.db
+*.sqlite3
+backend/storage_data/
+backend/peblo.db
+
+# --- Node (cms, viewer) ---
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+*.log
+npm-debug.log*
+
+# --- Docker / OS ---
+.DS_Store
+Thumbs.db
+
+# --- Editors ---
+.vscode/
+.idea/
+*.swp

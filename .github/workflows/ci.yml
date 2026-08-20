@@ -1,0 +1,310 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  # Used only for the docker build tags below.
+  IMAGE_PREFIX: ghcr.io/${{ github.repository }}
+
+jobs:
+  # ---------------------------------------------------------------------
+  # LINT
+  # ---------------------------------------------------------------------
+  lint-backend:
+    name: lint / backend (ruff + flake8)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install lint deps
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff flake8
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: ruff
+        working-directory: backend
+        run: ruff check .
+
+      - name: flake8
+        working-directory: backend
+        run: flake8 . --max-line-length=100 --extend-ignore=E203,W503
+
+  lint-cms:
+    name: lint / cms (eslint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: cms/package-lock.json
+
+      - name: Install deps
+        working-directory: cms
+        run: npm install
+
+      - name: eslint
+        working-directory: cms
+        # Falls back to the TS project's typecheck if no eslint config is
+        # present yet — keeps CI green while the CMS agent is still wiring
+        # eslint in, without silently skipping lint entirely.
+        run: |
+          if [ -f .eslintrc.cjs ] || [ -f .eslintrc.js ] || [ -f .eslintrc.json ] || [ -f eslint.config.js ]; then
+            npx eslint . --ext ts,tsx
+          else
+            echo "::warning::no eslint config found in cms/, running tsc --noEmit instead"
+            npm run lint
+          fi
+
+  lint-viewer:
+    name: lint / viewer (eslint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: viewer/package-lock.json
+
+      - name: Install deps
+        working-directory: viewer
+        run: npm install
+
+      - name: eslint
+        working-directory: viewer
+        run: npm run lint
+
+  # ---------------------------------------------------------------------
+  # TEST
+  # ---------------------------------------------------------------------
+  test-backend:
+    name: test / backend (pytest + postgres)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: peblo
+          POSTGRES_PASSWORD: peblo
+          POSTGRES_DB: peblo_tv_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U peblo -d peblo_tv_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://peblo:peblo@localhost:5432/peblo_tv_test
+      JWT_SECRET: ci-test-secret
+      CORS_ORIGIN: http://localhost:3000
+      STORAGE_DRIVER: local
+      STORAGE_LOCAL_PATH: /tmp/peblo-artwork
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install pytest pytest-cov
+
+      - name: Run migrations
+        working-directory: backend
+        run: alembic upgrade head
+
+      - name: Seed fixture data
+        working-directory: backend
+        run: python scripts/seed.py
+
+      - name: pytest
+        working-directory: backend
+        run: pytest -v --cov=app --cov-report=term-missing
+
+  test-cms:
+    name: test / cms (vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: cms/package-lock.json
+
+      - name: Install deps
+        working-directory: cms
+        run: npm install
+
+      - name: vitest
+        working-directory: cms
+        run: |
+          if npm run | grep -q " test"; then
+            npm run test -- --run
+          else
+            echo "::notice::no test script defined in cms/package.json yet, skipping"
+          fi
+
+  test-viewer:
+    name: test / viewer (vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: viewer/package-lock.json
+
+      - name: Install deps
+        working-directory: viewer
+        run: npm install
+
+      - name: vitest
+        working-directory: viewer
+        run: |
+          if npm run | grep -q " test"; then
+            npm run test -- --run
+          else
+            echo "::notice::no test script defined in viewer/package.json yet, skipping"
+          fi
+
+  # ---------------------------------------------------------------------
+  # BUILD
+  # ---------------------------------------------------------------------
+  build:
+    name: build / docker images
+    runs-on: ubuntu-latest
+    needs: [lint-backend, lint-cms, lint-viewer, test-backend, test-cms, test-viewer]
+    strategy:
+      matrix:
+        service: [backend, cms, viewer]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set image tag
+        run: echo "IMAGE_TAG=${GITHUB_SHA::12}" >> "$GITHUB_ENV"
+
+      - name: Build ${{ matrix.service }} image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./${{ matrix.service }}
+          push: false
+          tags: |
+            peblo-tv-mini-${{ matrix.service }}:${{ env.IMAGE_TAG }}
+            peblo-tv-mini-${{ matrix.service }}:latest
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+  # ---------------------------------------------------------------------
+  # DEPLOY (stub)
+  # ---------------------------------------------------------------------
+  # This job is intentionally a non-functional placeholder. The challenge
+  # brief explicitly says this project "doesn't need a real cloud to deploy
+  # to" — the point is to show the *shape* of a real CD pipeline (image
+  # publish -> staging deploy -> smoke test -> gated production promotion),
+  # not to actually stand up infrastructure. Nothing in this job will
+  # succeed against a real target because there is no real target; every
+  # step below is written the way it would look with a real staging/
+  # production environment wired in, with the parts you'd have to fill in
+  # called out explicitly.
+  deploy:
+    name: deploy (stub — not wired to a real environment)
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set image tag
+        run: echo "IMAGE_TAG=${GITHUB_SHA::12}" >> "$GITHUB_ENV"
+
+      # Real CD would authenticate to GHCR and push the images built above so
+      # a deploy target can pull them by immutable SHA tag.
+      #   - name: Log in to GHCR
+      #     uses: docker/login-action@v3
+      #     with:
+      #       registry: ghcr.io
+      #       username: ${{ github.actor }}
+      #       password: ${{ secrets.GITHUB_TOKEN }}
+      #   - name: Push images
+      #     run: |
+      #       for svc in backend cms viewer; do
+      #         docker tag peblo-tv-mini-$svc:$IMAGE_TAG $IMAGE_PREFIX/$svc:$IMAGE_TAG
+      #         docker push $IMAGE_PREFIX/$svc:$IMAGE_TAG
+      #       done
+      - name: "[placeholder] Push images to GHCR"
+        run: |
+          echo "Would push:"
+          echo "  $IMAGE_PREFIX/backend:$IMAGE_TAG"
+          echo "  $IMAGE_PREFIX/cms:$IMAGE_TAG"
+          echo "  $IMAGE_PREFIX/viewer:$IMAGE_TAG"
+          echo "(no registry configured for this challenge submission — see comments in this job for the real steps)"
+
+      # Real CD would then apply the new images to a staging environment.
+      # This could be an SSH + docker-compose pull/up on a single box, a
+      # `kubectl set image` / `kubectl rollout status` against a cluster, or
+      # a `terraform apply` against an ECS/Cloud Run/etc. definition that
+      # references these tags. Example (kubectl form):
+      #   - name: Deploy to staging
+      #     run: |
+      #       kubectl config use-context staging
+      #       kubectl set image deployment/peblo-api api=$IMAGE_PREFIX/backend:$IMAGE_TAG
+      #       kubectl set image deployment/peblo-cms cms=$IMAGE_PREFIX/cms:$IMAGE_TAG
+      #       kubectl set image deployment/peblo-viewer viewer=$IMAGE_PREFIX/viewer:$IMAGE_TAG
+      #       kubectl rollout status deployment/peblo-api
+      - name: "[placeholder] Deploy to staging"
+        run: |
+          echo "Would SSH/kubectl/terraform-apply the images above to a 'staging' target."
+          echo "No staging infrastructure exists for this challenge submission."
+
+      # Real CD would smoke-test the freshly deployed API before calling the
+      # staging deploy done.
+      #   - name: Smoke test staging /health
+      #     run: |
+      #       curl --fail --retry 5 --retry-delay 5 https://staging.peblo.example.com/health
+      - name: "[placeholder] Smoke test staging /health"
+        run: echo "Would curl --fail https://staging.<env>/health and fail the job on a non-200."
+
+  # Production is a separate job gated behind a manual-approval GitHub
+  # Environment ("production"), configured in the repo's Settings >
+  # Environments with required reviewers. Referencing `environment:
+  # production` here means this job pauses for approval before running, even
+  # though (again) there is nothing real for it to deploy to in this
+  # submission.
+  deploy-production:
+    name: deploy to production (manual approval gate — stub)
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      # url: https://peblo.example.com
+    steps:
+      - name: "[placeholder] Promote staging images to production"
+        run: |
+          echo "This job only runs after a human approves it via the 'production' GitHub Environment."
+          echo "Would re-tag/promote the staging images and re-run the same deploy + smoke-test steps"
+          echo "against the production target. No real production target exists for this challenge."

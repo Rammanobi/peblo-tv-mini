@@ -1,0 +1,137 @@
+{
+  "reference_version": "1.0.0",
+  "generated_for": "Peblo TV Mini",
+  "description": "Single source of truth for allowed enum values, artwork specifications and catalogue conventions. Every seed row, API payload and published catalogue entry MUST validate against this file.",
+
+  "sections": [
+    {
+      "key": "kids",
+      "label": "Kids",
+      "description": "Pre-school and early-primary content.",
+      "show_in_nav": true,
+      "sort_order": 1
+    },
+    {
+      "key": "family",
+      "label": "Family",
+      "description": "Co-viewing content suitable for all ages.",
+      "show_in_nav": true,
+      "sort_order": 2
+    },
+    {
+      "key": "originals",
+      "label": "Originals",
+      "description": "Peblo-commissioned original series.",
+      "show_in_nav": true,
+      "sort_order": 3
+    },
+    {
+      "key": "learning",
+      "label": "Learning",
+      "description": "Curriculum-aligned educational content.",
+      "show_in_nav": true,
+      "sort_order": 4
+    },
+    {
+      "key": "trailers",
+      "label": "Trailers",
+      "description": "Promotional/trailer surface. NEVER rendered as a navigable section in the Viewer UI; trailers are surfaced only on a show detail page. Excluded from catalogue section grouping.",
+      "show_in_nav": false,
+      "excluded_from_nav": true,
+      "sort_order": 99
+    }
+  ],
+
+  "categories": [
+    { "key": "comedy", "label": "Comedy" },
+    { "key": "adventure", "label": "Adventure" },
+    { "key": "educational", "label": "Educational" },
+    { "key": "music", "label": "Music" },
+    { "key": "fantasy", "label": "Fantasy" },
+    { "key": "nature", "label": "Nature" }
+  ],
+
+  "languages": [
+    { "code": "en", "label": "English", "is_default": true },
+    { "code": "hi", "label": "Hindi", "is_default": false },
+    { "code": "es", "label": "Spanish", "is_default": false }
+  ],
+
+  "statuses": [
+    { "key": "draft", "label": "Draft", "publishable": false },
+    { "key": "published", "label": "Published", "publishable": true },
+    { "key": "archived", "label": "Archived", "publishable": false }
+  ],
+
+  "artwork": {
+    "max_file_size_bytes": 204800,
+    "max_file_size_human": "200 KB",
+    "allowed_mime_types": ["image/jpeg", "image/png", "image/webp"],
+    "aspect_ratio_tolerance": 0.02,
+    "required_kinds_per_episode": ["poster", "banner", "thumbnail"],
+    "required_kinds_per_show": ["poster", "banner"],
+    "specs": [
+      {
+        "kind": "poster",
+        "aspect_ratio": "2:3",
+        "aspect_ratio_value": 0.6667,
+        "width": 600,
+        "height": 900,
+        "max_bytes": 204800,
+        "usage": "Vertical rail cards, show detail hero on mobile."
+      },
+      {
+        "kind": "banner",
+        "aspect_ratio": "16:9",
+        "aspect_ratio_value": 1.7778,
+        "width": 1280,
+        "height": 720,
+        "max_bytes": 204800,
+        "usage": "Hero banner on show detail and section spotlight."
+      },
+      {
+        "kind": "thumbnail",
+        "aspect_ratio": "16:9",
+        "aspect_ratio_value": 1.7778,
+        "width": 640,
+        "height": 360,
+        "max_bytes": 204800,
+        "usage": "Episode list rows and continue-watching tiles."
+      }
+    ]
+  },
+
+  "conventions": {
+    "season_zero_is_trailers": {
+      "rule": "season_number = 0 is RESERVED for trailers and promos.",
+      "details": [
+        "Season 0 MUST NOT appear in the normal season list rendered by the Viewer UI.",
+        "Season 0 episodes are exposed in the catalogue under a separate `trailers` array on the show object.",
+        "Trailer rows SHOULD use episode_number = null (or 0). A trailer carrying a real season episode number is a data error a validation report must flag.",
+        "Trailers are exempt from the `duration_seconds` minimum but still require artwork if published."
+      ]
+    },
+    "content_group_collapsing": {
+      "rule": "`content_group` identifies the same logical episode across language variants.",
+      "details": [
+        "Two or more episode rows sharing a `content_group` value are language variants of ONE episode (e.g. an English cut and a Hindi dub).",
+        "The publish job MUST collapse them into a SINGLE catalogue entry whose `languages` array lists every published variant's language code, sorted with the default language first.",
+        "The pair (content_group, language) MUST be globally unique. Two rows with the same content_group AND the same language is a blocking duplicate.",
+        "A content_group value MUST NOT span more than one show.",
+        "Collapsed entry field precedence: title/synopsis/duration/artwork are taken from the default-language variant (en) when present, otherwise from the lowest-id published variant."
+      ]
+    }
+  },
+
+  "validation_rules": [
+    { "code": "EPISODE_PUBLISHED_REQUIRES_DURATION", "message": "A published episode must have duration_seconds > 0.", "applies_to": "episode" },
+    { "code": "EPISODE_PUBLISHED_REQUIRES_ARTWORK", "message": "A published episode must have all of poster, banner and thumbnail artwork.", "applies_to": "episode" },
+    { "code": "CONTENT_GROUP_LANGUAGE_UNIQUE", "message": "The pair (content_group, language) must be unique across the catalogue.", "applies_to": "episode" },
+    { "code": "SHOW_PUBLISHED_REQUIRES_SECTION", "message": "A published show must be assigned to an allowed section.", "applies_to": "show" },
+    { "code": "TRAILER_MUST_NOT_HAVE_EPISODE_NUMBER", "message": "Season 0 (trailer) rows must not carry a season episode number.", "applies_to": "episode" },
+    { "code": "ARTWORK_ASPECT_RATIO", "message": "Artwork dimensions must match the declared aspect ratio for its kind within tolerance.", "applies_to": "artwork" },
+    { "code": "ARTWORK_SIZE_LIMIT", "message": "Artwork file must be 200 KB or smaller.", "applies_to": "artwork" },
+    { "code": "SHOW_PUBLISHED_REQUIRES_ARTWORK", "message": "A published show must have a poster and a banner.", "applies_to": "show" },
+    { "code": "ENUM_NOT_ALLOWED", "message": "Value is not present in reference.json allowed values.", "applies_to": "any" }
+  ]
+}
